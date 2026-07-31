@@ -1,0 +1,15 @@
+common:
+  num_stations: 30
+  horizon_minutes: 180
+  bus_wait_minutes: 10
+  epsilon: 0.2
+  max_passengers_per_order: 4
+  station_fairness_scale: 1.0
+  bus_time_scale: 1.0
+  station_time_scale: 1.0
+experiments:
+  1: {num_buses: 30, bus_capacity: 30, num_orders: 1200}
+  2: {num_buses: 50, bus_capacity: 30, num_orders: 1200}
+  3: {num_buses: 50, bus_capacity: 40, num_orders: 1200}
+  4: {num_buses: 50, bus_capacity: 30, num_orders: 900}
+  5: {num_buses: 50, bus_capacity: 30, num_orders: 1500}
