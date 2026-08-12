@@ -1,0 +1,8 @@
+config,avg_candidates,zero_rate,random_priority,greedy_priority,ipd_paper_priority,ipd_feasible_priority,opt_priority,ipdf_vs_random_pct,ipdf_vs_greedy_pct,ipdf_ratio_to_opt
+"{'route_overlap_factor': 8, 'bus_wave_std_minutes': 15, 'route_min_stations': 9, 'route_max_stations': 12}",0.659,0.579,152.02,152.262,245.894,160.703,211.745,5.71,5.54,0.759
+"{'route_overlap_factor': 10, 'bus_wave_std_minutes': 15, 'route_min_stations': 10, 'route_max_stations': 14}",0.735,0.545,157.999,158.883,265.971,165.085,225.021,4.49,3.9,0.734
+"{'route_overlap_factor': 12, 'bus_wave_std_minutes': 15, 'route_min_stations': 10, 'route_max_stations': 14}",0.732,0.55,155.665,156.172,262.762,161.154,222.49,3.53,3.19,0.724
+"{'route_overlap_factor': 14, 'bus_wave_std_minutes': 15, 'route_min_stations': 10, 'route_max_stations': 15}",0.757,0.534,159.226,158.717,270.01,165.762,226.897,4.11,4.44,0.731
+"{'route_overlap_factor': 12, 'bus_wave_std_minutes': 10, 'route_min_stations': 10, 'route_max_stations': 14}",0.742,0.592,156.491,158.73,242.713,163.774,212.126,4.65,3.18,0.772
+"{'route_overlap_factor': 14, 'bus_wave_std_minutes': 10, 'route_min_stations': 10, 'route_max_stations': 15}",0.777,0.575,157.577,160.812,249.914,163.784,216.677,3.94,1.85,0.756
+"{'route_overlap_factor': 12, 'bus_wave_std_minutes': 8, 'route_min_stations': 12, 'route_max_stations': 16}",0.884,0.571,162.604,163.919,254.693,171.025,222.322,5.18,4.34,0.769

@@ -7,6 +7,14 @@ common:
   station_fairness_scale: 1.0
   bus_time_scale: 1.0
   station_time_scale: 1.0
+  route_min_stations: 5
+  route_max_stations: 8
+  route_overlap_factor: 6
+  hot_station_boost: 2.0
+  prediction_noise: 0.25
+  bus_arrival_mode: wave
+  bus_wave_count: 3
+  bus_wave_std_minutes: 15
 experiments:
   1: {num_buses: 30, bus_capacity: 30, num_orders: 1200}
   2: {num_buses: 50, bus_capacity: 30, num_orders: 1200}

@@ -2,13 +2,13 @@ from __future__ import annotations
 import numpy as np
 from scipy.optimize import milp, Bounds, LinearConstraint
 from scipy.sparse import lil_matrix
-from .common import DispatchResult, available_buses, limits
+from .common import DispatchResult, SolverResult, available_buses, limits
 
 def offline_opt(orders,buses,station_count,cfg):
     pairs=[]
     for o in orders:
         for b in available_buses(o,buses): pairs.append((o,b))
-    if not pairs: return DispatchResult({},0.0,0,0.0)
+    if not pairs: return SolverResult(DispatchResult({},0.0,0,0.0), solver_status='no_pairs', solver_success=True, solver_time_limit_hit=False, solver_message='No feasible order-bus pairs')
     sc,bt,st=limits(orders,buses,station_count,cfg)
     rows=[]; ub=[]
     # each order at most one bus
@@ -40,4 +40,10 @@ def offline_opt(orders,buses,station_count,cfg):
     obj=sum(pairs[k][0].priority for k,val in enumerate(x) if val>0.5)
     pas=sum(pairs[k][0].passengers for k,val in enumerate(x) if val>0.5)
     tt=sum(pairs[k][0].passengers*pairs[k][1].station_travel_time[pairs[k][0].destination] for k,val in enumerate(x) if val>0.5)
-    return DispatchResult(acc,obj,pas,tt)
+    return SolverResult(
+        DispatchResult(acc,obj,pas,tt),
+        solver_status=str(getattr(res,'status',None)),
+        solver_success=bool(getattr(res,'success',False)),
+        solver_time_limit_hit='time limit' in str(getattr(res,'message','')).lower(),
+        solver_message=str(getattr(res,'message','')),
+    )

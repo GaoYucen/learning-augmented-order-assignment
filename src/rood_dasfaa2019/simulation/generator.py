@@ -30,9 +30,20 @@ def generate_instance(cfg: dict, seed: int):
             priority=float(rng.uniform(0.01,1.0)),
         ))
     orders.sort(key=lambda o:(o.arrival_time,o.id))
-    bus_arrivals=np.sort(rng.uniform(0,cfg['horizon_minutes']-cfg['bus_wait_minutes'],cfg['num_buses']))
-    demand=np.bincount([o.destination for o in orders], minlength=len(stations))
-    routes=build_bus_routes(stations,demand,cfg['num_buses'],cfg['bus_capacity'])
+    horizon=cfg['horizon_minutes']-cfg['bus_wait_minutes']
+    if cfg.get('bus_arrival_mode','uniform')=='wave':
+        wave_count=max(1,int(cfg.get('bus_wave_count',3)))
+        wave_std=float(cfg.get('bus_wave_std_minutes',8))
+        centers=np.linspace(horizon*0.2,horizon*0.8,wave_count)
+        picks=rng.choice(centers,size=cfg['num_buses'])
+        bus_arrivals=np.clip(rng.normal(picks,wave_std),0,horizon)
+        bus_arrivals=np.sort(bus_arrivals)
+    else:
+        bus_arrivals=np.sort(rng.uniform(0,horizon,cfg['num_buses']))
+    demand=np.bincount([o.destination for o in orders], minlength=len(stations)).astype(float)
+    noise=float(cfg.get('prediction_noise',0.25))
+    predicted=np.maximum(1.0,demand*rng.lognormal(mean=0.0,sigma=noise,size=len(demand)))
+    routes=build_bus_routes(stations,predicted,cfg['num_buses'],cfg['bus_capacity'],cfg=cfg,seed=seed)
     buses=[]
     for j,t in enumerate(bus_arrivals):
         route=routes[j]

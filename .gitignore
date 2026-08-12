@@ -17,7 +17,12 @@ build/
 # IDE files
 .vscode/
 .idea/
+.clinerules
+DASFAA_2019.pdf
 
 # Generated experiment outputs
 outputs/*
 !outputs/.gitkeep
+!outputs/results.csv
+!outputs/evaluate_ipd_candidates.csv
+!outputs/scan_ipd_configs.csv
