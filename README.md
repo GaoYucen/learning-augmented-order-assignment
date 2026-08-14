@@ -46,6 +46,31 @@ Run tests:
 pytest -q
 ```
 
+## Learning-augmented synthetic sanity-check
+
+This script is the first implementation entry for Student A. It creates a controlled experiment for learning-augmented online dispatch:
+
+```text
+slot orders -> synthetic prediction -> predictive LP advice
+-> online dispatch algorithms -> offline OPT comparison -> CSV/figure outputs
+```
+
+Run the bottleneck setting:
+
+```bash
+python scripts/synthetic_sanity_check.py --setting bottleneck --slots 5 --prediction-scales 1.0 0.75 1.25 0.5 1.5 --thetas 0.2 0.4 0.6 0.8 --output-dir outputs/synthetic_sanity_bottleneck
+```
+
+The script compares `Random`, `Greedy`, `IPD`, `Prediction-only`, and `RP-LAIPD`. `Prediction-only` follows predictive LP advice directly. `RP-LAIPD` mixes the prediction advice with the original IPD idea; larger `theta` means the algorithm trusts prediction more.
+
+Generated files:
+
+- `synthetic_sanity_results.csv`: raw result of every slot/method/prediction setting.
+- `synthetic_sanity_summary.csv`: grouped mean/std/95% CI, easier to read and report.
+- `alg_over_opt_vs_prediction_error.png`: trend figure of `ALG/OPT` against prediction error.
+
+For Student A's A1/A2 tasks, this is a synthetic sanity-check, not the final real-data predictor experiment. Its purpose is to verify that the experiment pipeline works and that learning-augmented methods behave reasonably when prediction quality changes.
+
 ## Repository layout
 
 ```text
