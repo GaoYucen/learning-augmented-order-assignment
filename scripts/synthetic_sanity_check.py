@@ -3,213 +3,14 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
-from time import perf_counter
 
 import matplotlib.pyplot as plt
 import pandas as pd
 
-from rood_dasfaa2019.algorithms import (
-    greedy_dispatch,
-    ipd_dispatch,
-    offline_opt,
-    prediction_only_dispatch,
-    random_dispatch,
-    rp_laipd_dispatch,
-)
-from rood_dasfaa2019.algorithms.laipd import build_predictive_lp_advice
+from rood_dasfaa2019.learning.metrics import summarize_results
+from rood_dasfaa2019.learning.runner import run_learning_augmented_instance, run_learning_augmented_slot
 from rood_dasfaa2019.simulation.entities import Bus, Order, Station
-from rood_dasfaa2019.simulation.generator import generate_instance
 from rood_dasfaa2019.utils.config import load_experiment
-
-
-def type_counts(orders, station_count):
-    counts = {station: 0.0 for station in range(station_count)}
-    for order in orders:
-        counts[order.destination] += order.passengers
-    return counts
-
-
-def predicted_type_counts(orders, station_count, prediction_scale, corruption, corruption_strength):
-    truth = type_counts(orders, station_count)
-    predicted = {station: truth[station] * prediction_scale for station in truth}
-    if corruption == "permutation" and corruption_strength > 0:
-        selected = list(range(station_count))[: max(0, int(round(station_count * corruption_strength)))]
-        if len(selected) >= 2:
-            values = [predicted[selected[-1]], *[predicted[station] for station in selected[:-1]]]
-            for station, value in zip(selected, values):
-                predicted[station] = value
-    elif corruption == "adversarial_concentration" and corruption_strength > 0:
-        ordered = sorted(range(station_count), key=lambda station: predicted[station])
-        source_count = max(1, int(round(station_count * min(max(corruption_strength, 0.0), 1.0) / 2)))
-        sources = ordered[-source_count:]
-        target = ordered[0]
-        moved = sum(predicted[source] for source in sources)
-        for source in sources:
-            predicted[source] = 0.0
-        predicted[target] += moved
-    return predicted
-
-
-def prediction_error(orders, station_count, prediction_scale, corruption, corruption_strength):
-    truth = type_counts(orders, station_count)
-    predicted = predicted_type_counts(orders, station_count, prediction_scale, corruption, corruption_strength)
-    absolute_error = sum(abs(predicted[station] - truth[station]) for station in truth)
-    total = max(sum(truth.values()), 1.0)
-    return absolute_error / total
-
-
-def opt_type_bus_allocation(orders, opt_result):
-    order_by_id = {order.id: order for order in orders}
-    allocation = {}
-    for order_id, bus_id in opt_result.accepted.items():
-        order = order_by_id[order_id]
-        key = (order.destination, bus_id)
-        allocation[key] = allocation.get(key, 0.0) + order.passengers
-    return allocation
-
-
-def advice_error(advice, opt_allocation):
-    keys = set(advice) | set(opt_allocation)
-    absolute_error = sum(abs(advice.get(key, 0.0) - opt_allocation.get(key, 0.0)) for key in keys)
-    total = max(sum(opt_allocation.values()), 1.0)
-    return absolute_error / total
-
-
-def high_value_rejected_count(orders, result):
-    if not orders:
-        return 0
-    threshold = pd.Series([order.priority for order in orders]).quantile(0.75)
-    accepted = set(result.accepted)
-    return sum(1 for order in orders if order.priority >= threshold and order.id not in accepted)
-
-
-def dispatch_row(
-    slot_id,
-    method,
-    theta,
-    prediction_scale,
-    corruption,
-    corruption_strength,
-    pred_error,
-    adv_error,
-    orders,
-    result,
-    opt_result,
-    elapsed_ms,
-):
-    dispatch = result.dispatch
-    opt = opt_result.dispatch
-    return {
-        "slot_id": slot_id,
-        "method": method,
-        "theta": theta,
-        "prediction_scale": prediction_scale,
-        "prediction_corruption": corruption,
-        "corruption_strength": corruption_strength,
-        "prediction_error": pred_error,
-        "advice_error": adv_error,
-        "accepted_value": dispatch.objective,
-        "offline_value": opt.objective,
-        "alg_over_opt": dispatch.objective / max(opt.objective, 1e-9),
-        "served_orders": len(dispatch.accepted),
-        "served_passengers": dispatch.passengers,
-        "occupancy": dispatch.passengers / max(opt.passengers, 1),
-        "high_value_rejected": high_value_rejected_count(orders, result),
-        "violations": 0,
-        "slot_runtime_ms": elapsed_ms,
-        "avg_request_latency_ms": elapsed_ms / max(len(dispatch.accepted), 1),
-    }
-
-
-def timed(fn):
-    start = perf_counter()
-    result = fn()
-    return result, (perf_counter() - start) * 1000
-
-
-def run_one_slot(cfg, seed, prediction_scales, corruption_strengths, corruption, thetas, slot_id):
-    stations, orders, buses = generate_instance(cfg, seed)
-    return run_instance(stations, orders, buses, cfg, seed, prediction_scales, corruption_strengths, corruption, thetas, slot_id)
-
-
-def run_instance(stations, orders, buses, cfg, seed, prediction_scales, corruption_strengths, corruption, thetas, slot_id):
-    opt_result, _ = timed(lambda: offline_opt(orders, buses, len(stations), cfg))
-    opt_allocation = opt_type_bus_allocation(orders, opt_result)
-    rows = []
-
-    random_result, random_ms = timed(lambda: random_dispatch(orders, buses, len(stations), cfg, seed))
-    greedy_result, greedy_ms = timed(lambda: greedy_dispatch(orders, buses, len(stations), cfg))
-    ipd_result, ipd_ms = timed(lambda: ipd_dispatch(orders, buses, len(stations), cfg))
-    scenarios = [(scale, 0.0 if corruption == "scale" else strength) for scale in prediction_scales for strength in corruption_strengths]
-    if corruption == "scale":
-        scenarios = [(scale, abs(scale - 1.0)) for scale in prediction_scales]
-
-    for scale, strength in scenarios:
-        scaled_cfg = dict(cfg)
-        scaled_cfg["prediction_scale"] = scale
-        scaled_cfg["prediction_corruption"] = corruption
-        scaled_cfg["corruption_strength"] = strength
-        advice = build_predictive_lp_advice(orders, buses, len(stations), scaled_cfg)
-        pred_error = prediction_error(orders, len(stations), scale, corruption, strength)
-        adv_error = advice_error(advice, opt_allocation)
-        rows.append(
-            dispatch_row(slot_id, "Random", "", scale, corruption, strength, pred_error, adv_error, orders, random_result, opt_result, random_ms)
-        )
-        rows.append(
-            dispatch_row(slot_id, "Greedy", "", scale, corruption, strength, pred_error, adv_error, orders, greedy_result, opt_result, greedy_ms)
-        )
-        rows.append(
-            dispatch_row(slot_id, "IPD", "", scale, corruption, strength, pred_error, adv_error, orders, ipd_result, opt_result, ipd_ms)
-        )
-
-    for scale, strength in scenarios:
-        scaled_cfg = dict(cfg)
-        scaled_cfg["prediction_scale"] = scale
-        scaled_cfg["prediction_corruption"] = corruption
-        scaled_cfg["corruption_strength"] = strength
-        advice = build_predictive_lp_advice(orders, buses, len(stations), scaled_cfg)
-        pred_error = prediction_error(orders, len(stations), scale, corruption, strength)
-        adv_error = advice_error(advice, opt_allocation)
-        result, elapsed_ms = timed(lambda: prediction_only_dispatch(orders, buses, len(stations), scaled_cfg))
-        rows.append(
-            dispatch_row(
-                slot_id,
-                "Prediction-only",
-                "",
-                scale,
-                corruption,
-                strength,
-                pred_error,
-                adv_error,
-                orders,
-                result,
-                opt_result,
-                elapsed_ms,
-            )
-        )
-
-        for theta in thetas:
-            theta_cfg = dict(scaled_cfg)
-            theta_cfg["theta"] = theta
-            result, elapsed_ms = timed(lambda: rp_laipd_dispatch(orders, buses, len(stations), theta_cfg))
-            rows.append(
-                dispatch_row(
-                    slot_id,
-                    "RP-LAIPD",
-                    theta,
-                    scale,
-                    corruption,
-                    strength,
-                    pred_error,
-                    adv_error,
-                    orders,
-                    result,
-                    opt_result,
-                    elapsed_ms,
-                )
-            )
-
-    return rows
 
 
 def generate_bottleneck_instance(cfg, seed):
@@ -292,40 +93,6 @@ def plot_sanity(df: pd.DataFrame, path: Path) -> None:
     plt.close(fig)
 
 
-def summarize_results(df: pd.DataFrame) -> pd.DataFrame:
-    grouped = df.groupby(
-        [
-            "method",
-            "theta",
-            "prediction_scale",
-            "prediction_corruption",
-            "corruption_strength",
-        ],
-        dropna=False,
-    )
-    summary = grouped.agg(
-        runs=("slot_id", "count"),
-        prediction_error_mean=("prediction_error", "mean"),
-        prediction_error_std=("prediction_error", "std"),
-        advice_error_mean=("advice_error", "mean"),
-        advice_error_std=("advice_error", "std"),
-        alg_over_opt_mean=("alg_over_opt", "mean"),
-        alg_over_opt_std=("alg_over_opt", "std"),
-        accepted_value_mean=("accepted_value", "mean"),
-        accepted_value_std=("accepted_value", "std"),
-        served_orders_mean=("served_orders", "mean"),
-        high_value_rejected_mean=("high_value_rejected", "mean"),
-        slot_runtime_ms_mean=("slot_runtime_ms", "mean"),
-    ).reset_index()
-    summary["prediction_error_std"] = summary["prediction_error_std"].fillna(0.0)
-    summary["advice_error_std"] = summary["advice_error_std"].fillna(0.0)
-    summary["alg_over_opt_std"] = summary["alg_over_opt_std"].fillna(0.0)
-    summary["accepted_value_std"] = summary["accepted_value_std"].fillna(0.0)
-    summary["alg_over_opt_ci95"] = 1.96 * summary["alg_over_opt_std"] / summary["runs"].pow(0.5)
-    summary["accepted_value_ci95"] = 1.96 * summary["accepted_value_std"] / summary["runs"].pow(0.5)
-    return summary.sort_values(["prediction_error_mean", "method", "theta"]).reset_index(drop=True)
-
-
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--experiment", type=int, default=1, choices=range(1, 6))
@@ -374,7 +141,7 @@ def main():
         if args.setting == "bottleneck":
             stations, orders, buses = generate_bottleneck_instance(cfg, seed)
             rows.extend(
-                run_instance(
+                run_learning_augmented_instance(
                     stations,
                     orders,
                     buses,
@@ -389,7 +156,7 @@ def main():
             )
         else:
             rows.extend(
-                run_one_slot(
+                run_learning_augmented_slot(
                     cfg=cfg,
                     seed=seed,
                     prediction_scales=args.prediction_scales,

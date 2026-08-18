@@ -71,6 +71,13 @@ Generated files:
 
 For Student A's A1/A2 tasks, this is a synthetic sanity-check, not the final real-data predictor experiment. Its purpose is to verify that the experiment pipeline works and that learning-augmented methods behave reasonably when prediction quality changes.
 
+Core learning-augmented modules:
+
+- `src/rood_dasfaa2019/learning/request_types.py`: maps each order to a request type. The current definition uses destination station.
+- `src/rood_dasfaa2019/learning/prediction.py`: provides the synthetic prediction provider used before a real predictor is integrated.
+- `src/rood_dasfaa2019/learning/metrics.py`: computes prediction error, advice error, ALG/OPT rows, and grouped summaries.
+- `src/rood_dasfaa2019/learning/runner.py`: provides the unified experiment runner for Random, Greedy, IPD, Prediction-only, and RP-LAIPD.
+
 ## Repository layout
 
 ```text
@@ -78,6 +85,7 @@ configs/                  Five paper experiment settings
 data/stations/             Synthetic 30-station airport benchmark
 src/rood_dasfaa2019/
   algorithms/              Random, Greedy, FPD, IPD, offline OPT
+  learning/                Request types, prediction advice, metrics, unified runner
   routing/                 Demand prediction and capacity-aware routing
   simulation/              Entities, instance generation, metrics
   utils/                   Configuration and reproducibility helpers

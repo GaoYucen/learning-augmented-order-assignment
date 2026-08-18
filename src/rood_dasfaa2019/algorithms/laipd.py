@@ -3,8 +3,10 @@ from __future__ import annotations
 from collections import defaultdict
 
 import numpy as np
-from scipy.optimize import LinearConstraint, linprog
+from scipy.optimize import linprog
 from scipy.sparse import lil_matrix
+
+from rood_dasfaa2019.learning.prediction import SyntheticPredictionProvider
 
 from .common import *
 
@@ -16,51 +18,9 @@ def _predicted_type_counts(orders, station_count, cfg):
     checks: it starts from realized type counts and corrupts them with a simple
     scaling factor. Later this can be replaced by an external predictor.
     """
-    scale = float(cfg.get("prediction_scale", 1.0))
-    corruption = str(cfg.get("prediction_corruption", "scale"))
-    corruption_strength = float(cfg.get("corruption_strength", abs(scale - 1.0)))
-    floor = float(cfg.get("prediction_floor", 1.0))
-    counts = {v: 0.0 for v in range(station_count)}
-    for order in orders:
-        counts[order.destination] += order.passengers
-
-    predicted = {v: counts[v] * scale for v in range(station_count)}
-    if corruption == "permutation" and corruption_strength > 0:
-        predicted = _permute_type_counts(predicted, corruption_strength)
-    elif corruption == "adversarial_concentration" and corruption_strength > 0:
-        predicted = _concentrate_type_counts(predicted, corruption_strength)
-    return {v: max(floor, predicted[v]) for v in range(station_count)}
-
-
-def _permute_type_counts(counts, strength):
-    stations = sorted(counts)
-    if len(stations) < 2:
-        return counts
-    swap_count = min(len(stations), max(0, int(round(len(stations) * strength))))
-    if swap_count < 2:
-        return counts
-    selected = stations[:swap_count]
-    rotated_values = [counts[selected[-1]], *[counts[s] for s in selected[:-1]]]
-    corrupted = dict(counts)
-    for station, value in zip(selected, rotated_values):
-        corrupted[station] = value
-    return corrupted
-
-
-def _concentrate_type_counts(counts, strength):
-    stations = sorted(counts)
-    if len(stations) < 2:
-        return counts
-    corrupted = dict(counts)
-    sorted_by_demand = sorted(stations, key=lambda station: counts[station])
-    source_count = max(1, int(round(len(stations) * min(max(strength, 0.0), 1.0) / 2)))
-    sources = sorted_by_demand[-source_count:]
-    target = sorted_by_demand[0]
-    moved = sum(corrupted[source] for source in sources)
-    for source in sources:
-        corrupted[source] = 0.0
-    corrupted[target] += moved
-    return corrupted
+    advice_cfg = dict(cfg)
+    advice_cfg.setdefault("prediction_floor", 1.0)
+    return SyntheticPredictionProvider(advice_cfg).predict(orders, station_count)
 
 
 def build_predictive_lp_advice(orders, buses, station_count, cfg):
