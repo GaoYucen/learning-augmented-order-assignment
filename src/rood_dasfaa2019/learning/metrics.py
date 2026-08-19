@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pandas as pd
+import numpy as np
 
 from rood_dasfaa2019.algorithms.common import SolverResult
 from rood_dasfaa2019.simulation.entities import Order
@@ -63,13 +64,25 @@ def dispatch_row(
     result: SolverResult,
     opt_result: SolverResult,
     elapsed_ms: float,
+    total_capacity: float | None = None,
+    violations: int = 0,
+    seed: int | None = None,
+    split: str | None = None,
+    prediction_model: str | None = None,
+    prediction_time_ms: float = 0.0,
+    predictive_lp_time_ms: float = 0.0,
+    slot_preparation_ms: float = 0.0,
 ) -> dict:
     dispatch = result.dispatch
     opt = opt_result.dispatch
+    latencies = result.request_latencies_ms or []
     return {
+        "seed": seed,
+        "split": split,
         "slot_id": slot_id,
         "method": method,
         "theta": theta,
+        "prediction_model": prediction_model,
         "prediction_scale": prediction_scale,
         "prediction_corruption": corruption,
         "corruption_strength": corruption_strength,
@@ -80,11 +93,20 @@ def dispatch_row(
         "alg_over_opt": dispatch.objective / max(opt.objective, 1e-9),
         "served_orders": len(dispatch.accepted),
         "served_passengers": dispatch.passengers,
-        "occupancy": dispatch.passengers / max(opt.passengers, 1),
+        "occupancy": dispatch.passengers / max(total_capacity, 1.0) if total_capacity is not None else np.nan,
         "high_value_rejected": high_value_rejected_count(orders, result),
-        "violations": 0,
+        "violations": violations,
+        "prediction_time_ms": prediction_time_ms,
+        "predictive_lp_time_ms": predictive_lp_time_ms,
+        "slot_preparation_ms": slot_preparation_ms,
         "slot_runtime_ms": elapsed_ms,
-        "avg_request_latency_ms": elapsed_ms / max(len(dispatch.accepted), 1),
+        "avg_request_latency_ms": float(np.mean(latencies)) if latencies else elapsed_ms / max(len(orders), 1),
+        "p95_request_latency_ms": float(np.quantile(latencies, 0.95)) if latencies else np.nan,
+        "opt_status": opt_result.solver_status,
+        "opt_success": opt_result.solver_success,
+        "opt_time_limit_hit": opt_result.solver_time_limit_hit,
+        "opt_dual_bound": opt_result.solver_dual_bound,
+        "opt_gap": opt_result.solver_mip_gap,
     }
 
 

@@ -1,0 +1,45 @@
+data:
+  raw_data_dir: "D:/route规划/chengdu order"
+  output_dir: "outputs/chengdu"
+  timezone: "Asia/Shanghai"
+  slot_minutes: 30
+  station_count: 30
+  min_duration_seconds: 1
+  max_duration_seconds: 14400
+  max_orders_per_slot: 300
+  random_seed: 2026
+  train_start: "2016-11-01"
+  train_end: "2016-11-20"
+  validation_start: "2016-11-21"
+  validation_end: "2016-11-24"
+  test_start: "2016-11-25"
+  test_end: "2016-11-27"
+  shifted_test_start: "2016-11-28"
+  shifted_test_end: "2016-11-30"
+
+experiment:
+  num_buses: 10
+  bus_capacity: 30
+  route_min_stations: 5
+  route_max_stations: 8
+  route_overlap_factor: 6
+  horizon_minutes: 30
+  bus_wait_minutes: 30
+  epsilon: 0.2
+  selected_theta: 0.4
+  station_fairness_scale: 1.0
+  bus_time_scale: 1.0
+  station_time_scale: 1.0
+  high_value_quantile: 0.75
+  opt_time_limit_seconds: 30
+  seeds: [2026, 2027, 2028, 2029, 2030]
+
+prediction:
+  seasonal_period: 48
+  ridge_alpha: 1.0
+  lag_steps: [1, 2, 48, 96, 336]
+  gradient_boosting_max_iter: 100
+  gradient_boosting_max_depth: 6
+  gradient_boosting_learning_rate: 0.05
+  checkpoint_iterations: [1, 2, 5, 10, 20, 50, 100, 200]
+  checkpoint_test_slots: 12

@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "Reimplementation of Real-Time Route Planning and Online Order Dispatch for Bus-Booking Platforms"
 readme = "README.md"
 requires-python = ">=3.10"
-dependencies = ["numpy>=1.24", "pandas>=2.0", "matplotlib>=3.7", "PyYAML>=6.0", "scipy>=1.10"]
+dependencies = ["numpy>=1.24", "pandas>=2.0", "matplotlib>=3.7", "PyYAML>=6.0", "scipy>=1.10", "scikit-learn>=1.6"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

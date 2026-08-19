@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from time import perf_counter
 
 import numpy as np
 from scipy.optimize import linprog
@@ -23,20 +24,25 @@ def _predicted_type_counts(orders, station_count, cfg):
     return SyntheticPredictionProvider(advice_cfg).predict(orders, station_count)
 
 
-def build_predictive_lp_advice(orders, buses, station_count, cfg):
+def build_predictive_lp_advice(orders, buses, station_count, cfg, predicted_counts=None, type_values=None):
     """Solve the predictive LP and return type-to-bus quotas y_hat_kj."""
-    predicted = _predicted_type_counts(orders, station_count, cfg)
+    predicted = _predicted_type_counts(orders, station_count, cfg) if predicted_counts is None else {
+        station: max(float(predicted_counts.get(station, 0.0)), 0.0) for station in range(station_count)
+    }
     avg_priority = {v: 0.0 for v in range(station_count)}
     type_counts = {v: 0 for v in range(station_count)}
-    for order in orders:
-        avg_priority[order.destination] += order.priority
-        type_counts[order.destination] += 1
-    global_avg = sum(order.priority for order in orders) / max(len(orders), 1)
-    for station in range(station_count):
-        if type_counts[station]:
-            avg_priority[station] /= type_counts[station]
-        else:
-            avg_priority[station] = global_avg
+    if type_values is None:
+        for order in orders:
+            avg_priority[order.destination] += order.priority
+            type_counts[order.destination] += 1
+        global_avg = sum(order.priority for order in orders) / max(len(orders), 1)
+        for station in range(station_count):
+            if type_counts[station]:
+                avg_priority[station] /= type_counts[station]
+            else:
+                avg_priority[station] = global_avg
+    else:
+        avg_priority = {station: float(type_values.get(station, 0.0)) for station in range(station_count)}
 
     pairs = [
         (station, bus)
@@ -99,15 +105,15 @@ def build_predictive_lp_advice(orders, buses, station_count, cfg):
     return quota
 
 
-def _build_type_bus_advice(orders, buses, station_count, cfg):
-    return build_predictive_lp_advice(orders, buses, station_count, cfg)
+def _build_type_bus_advice(orders, buses, station_count, cfg, predicted_counts=None, type_values=None):
+    return build_predictive_lp_advice(orders, buses, station_count, cfg, predicted_counts, type_values)
 
 
 def _quota_remaining(order, bus, used_quota, advice):
     return advice.get((order.destination, bus.id), 0.0) - used_quota[(order.destination, bus.id)]
 
 
-def prediction_only_dispatch(orders, buses, station_count, cfg):
+def prediction_only_dispatch(orders, buses, station_count, cfg, advice=None):
     """Dispatch by following predicted type-to-bus quota as much as possible."""
     buses = clone_buses(buses)
     sc, bt, st = limits(orders, buses, station_count, cfg)
@@ -116,13 +122,16 @@ def prediction_only_dispatch(orders, buses, station_count, cfg):
     acc = {}
     reasons = {}
     used_quota = defaultdict(float)
-    advice = _build_type_bus_advice(orders, buses, station_count, cfg)
+    advice = _build_type_bus_advice(orders, buses, station_count, cfg) if advice is None else advice
     cand_stats = candidate_stats(orders, buses)
+    latencies = []
 
     for order in orders:
+        started = perf_counter()
         candidates = available_buses(order, buses)
         if not candidates:
             reasons["no_candidate"] = reasons.get("no_candidate", 0) + 1
+            latencies.append((perf_counter() - started) * 1000)
             continue
         candidates.sort(
             key=lambda bus: (
@@ -144,11 +153,12 @@ def prediction_only_dispatch(orders, buses, station_count, cfg):
                 break
         if not accepted:
             reasons["quota_or_feasibility"] = reasons.get("quota_or_feasibility", 0) + 1
+        latencies.append((perf_counter() - started) * 1000)
 
-    return SolverResult(summarize(acc, orders, buses), diagnostics=make_diagnostics(cand_stats, reasons))
+    return SolverResult(summarize(acc, orders, buses), diagnostics=make_diagnostics(cand_stats, reasons), request_latencies_ms=latencies)
 
 
-def rp_laipd_dispatch(orders, buses, station_count, cfg):
+def rp_laipd_dispatch(orders, buses, station_count, cfg, advice=None):
     """Learning-augmented IPD with a quota-aware prediction branch.
 
     theta controls how much the method trusts prediction advice:
@@ -170,13 +180,16 @@ def rp_laipd_dispatch(orders, buses, station_count, cfg):
     acc = {}
     reasons = {}
     used_quota = defaultdict(float)
-    advice = _build_type_bus_advice(orders, buses, station_count, cfg)
+    advice = _build_type_bus_advice(orders, buses, station_count, cfg) if advice is None else advice
     cand_stats = candidate_stats(orders, buses)
+    latencies = []
 
     for order in orders:
+        started = perf_counter()
         candidates = available_buses(order, buses)
         if not candidates:
             reasons["no_candidate"] = reasons.get("no_candidate", 0) + 1
+            latencies.append((perf_counter() - started) * 1000)
             continue
 
         def score(bus):
@@ -223,5 +236,6 @@ def rp_laipd_dispatch(orders, buses, station_count, cfg):
         if not accepted:
             key = first_reason or "not_accepted"
             reasons[key] = reasons.get(key, 0) + 1
+        latencies.append((perf_counter() - started) * 1000)
 
-    return SolverResult(summarize(acc, orders, buses), diagnostics=make_diagnostics(cand_stats, reasons))
+    return SolverResult(summarize(acc, orders, buses), diagnostics=make_diagnostics(cand_stats, reasons), request_latencies_ms=latencies)

@@ -26,3 +26,9 @@ outputs/*
 !outputs/results.csv
 !outputs/evaluate_ipd_candidates.csv
 !outputs/scan_ipd_configs.csv
+
+# Didi raw/processed data must not be committed or redistributed.
+data/raw/
+data/processed/
+*.parquet
+*.pkl
