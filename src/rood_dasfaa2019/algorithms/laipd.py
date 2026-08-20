@@ -106,6 +106,26 @@ def _quota_remaining(order, bus, used_quota, advice):
     return advice.get((order.destination, bus.id), 0.0) - used_quota[(order.destination, bus.id)]
 
 
+def _scaled_buses(buses, fraction):
+    scaled = clone_buses(buses)
+    for bus in scaled:
+        bus.capacity *= fraction
+    return scaled
+
+
+def _scaled_resource_cfg(orders, buses, station_count, cfg, fraction):
+    station_cap, bus_time, station_time = limits(orders, buses, station_count, cfg)
+    scaled = dict(cfg)
+    scaled["station_capacity"] = {station: cap * fraction for station, cap in station_cap.items()}
+    scaled["bus_time_capacity"] = {bus_id: cap * fraction for bus_id, cap in bus_time.items()}
+    scaled["station_time_capacity"] = {station: cap * fraction for station, cap in station_time.items()}
+    return scaled
+
+
+def _scaled_advice(advice, fraction):
+    return defaultdict(float, {key: value * fraction for key, value in advice.items()})
+
+
 def prediction_only_dispatch(orders, buses, station_count, cfg, advice=None):
     """Dispatch by following predicted type-to-bus quota as much as possible."""
     buses = clone_buses(buses)
@@ -148,79 +168,99 @@ def prediction_only_dispatch(orders, buses, station_count, cfg, advice=None):
 
 
 def rp_laipd_dispatch(orders, buses, station_count, cfg, advice=None):
-    """Learning-augmented IPD with a quota-aware prediction branch.
+    """Resource-partitioned learning-augmented IPD.
 
-    theta controls how much the method trusts prediction advice:
-    - theta=0 behaves close to IPD candidate scoring.
-    - theta=1 strongly prioritizes remaining predictive quota.
+    theta partitions every resource into an advice branch and a robust branch:
+    bP = theta * b and bR = (1 - theta) * b. Advice decisions consume only
+    bP, while rejected advice requests fall back to an independent IPD state on
+    bR. This matches the journal-draft RP-LAIPD structure and keeps arbitrary
+    advice from corrupting the robust branch.
     """
     eps = float(cfg.get("epsilon", 0.2))
     theta = float(cfg.get("theta", 0.5))
     theta = min(max(theta, 0.0), 1.0)
 
-    buses = clone_buses(buses)
-    sc, bt, st = limits(orders, buses, station_count, cfg)
-    sp = {v: 0 for v in range(station_count)}
-    sx = {v: 0.0 for v in range(station_count)}
-    z = {bus.id: 0.0 for bus in buses}
-    u = {bus.id: 0.0 for bus in buses}
+    full_buses = clone_buses(buses)
+    advice_buses = _scaled_buses(buses, theta)
+    robust_buses = _scaled_buses(buses, 1.0 - theta)
+    advice_cfg = _scaled_resource_cfg(orders, full_buses, station_count, cfg, theta)
+    robust_cfg = _scaled_resource_cfg(orders, full_buses, station_count, cfg, 1.0 - theta)
+
+    sc_p, bt_p, st_p = limits(orders, advice_buses, station_count, advice_cfg)
+    sp_p = {v: 0 for v in range(station_count)}
+    sx_p = {v: 0.0 for v in range(station_count)}
+
+    sc_r, bt_r, st_r = limits(orders, robust_buses, station_count, robust_cfg)
+    sp_r = {v: 0 for v in range(station_count)}
+    sx_r = {v: 0.0 for v in range(station_count)}
+    z = {bus.id: 0.0 for bus in robust_buses}
+    u = {bus.id: 0.0 for bus in robust_buses}
     r = {v: 0.0 for v in range(station_count)}
     q = {v: 0.0 for v in range(station_count)}
+
     acc = {}
     reasons = {}
     used_quota = defaultdict(float)
-    advice = _build_type_bus_advice(orders, buses, station_count, cfg, advice=advice)
-    cand_stats = candidate_stats(orders, buses)
+    advice = _scaled_advice(_build_type_bus_advice(orders, full_buses, station_count, cfg, advice=advice), theta)
+    cand_stats = candidate_stats(orders, full_buses)
 
     for order in orders:
-        candidates = available_buses(order, buses)
-        if not candidates:
+        full_candidates = available_buses(order, full_buses)
+        if not full_candidates:
             reasons["no_candidate"] = reasons.get("no_candidate", 0) + 1
             continue
 
-        def score(bus):
-            travel = bus.station_travel_time[order.destination] * order.passengers
-            ipd_score = order.passengers * z[bus.id] + travel * (u[bus.id] + q[order.destination])
-            remaining = max(_quota_remaining(order, bus, used_quota, advice), 0.0)
-            prediction_bonus = remaining / max(order.passengers, 1)
-            return (1.0 - theta) * ipd_score - theta * prediction_bonus
-
-        candidates.sort(key=score)
-        accepted = False
-        first_reason = None
-        for bus in candidates:
-            remaining_quota = _quota_remaining(order, bus, used_quota, advice)
-            if theta >= 0.5 and remaining_quota < order.passengers and order.priority < cfg.get("prediction_release_priority", 0.5):
-                first_reason = first_reason or "prediction_quota"
-                continue
-            travel = bus.station_travel_time[order.destination] * order.passengers
-            dual = order.passengers * (z[bus.id] + r[order.destination]) + travel * (
-                u[bus.id] + q[order.destination]
+        advice_candidates = available_buses(order, advice_buses)
+        advice_candidates.sort(
+            key=lambda bus: (
+                -_quota_remaining(order, bus, used_quota, advice),
+                bus.station_travel_time[order.destination],
+                -bus.remaining_seats,
             )
-            relaxed_dual = (1.0 - theta) * dual
-            reason = rejection_reason(order, bus, sp, sx, sc, bt, st, relaxed_dual)
-            if first_reason is None:
-                first_reason = reason
+        )
+        accepted = False
+        for bus in advice_candidates:
+            if _quota_remaining(order, bus, used_quota, advice) < order.passengers:
+                continue
+            reason = rejection_reason(order, bus, sp_p, sx_p, sc_p, bt_p, st_p)
             if reason == "accepted":
-                commit(order, bus, sp, sx)
+                commit(order, bus, sp_p, sx_p)
                 used_quota[(order.destination, bus.id)] += order.passengers
                 acc[order.id] = bus.id
-                z[bus.id] = z[bus.id] * (1 + order.passengers / max(bus.capacity, 1)) + order.priority * eps / (
-                    4 * max(bus.capacity, 1)
-                )
-                r[order.destination] = r[order.destination] * (
-                    1 + order.passengers / max(sc[order.destination], 1e-9)
-                ) + order.priority * eps / (4 * max(sc[order.destination], 1e-9))
-                u[bus.id] = u[bus.id] * (1 + travel / max(bt[bus.id], 1e-9)) + order.priority * eps / (
-                    4 * max(bt[bus.id], 1e-9)
-                )
-                q[order.destination] = q[order.destination] * (
-                    1 + travel / max(st[order.destination], 1e-9)
-                ) + order.priority * eps / (4 * max(st[order.destination], 1e-9))
                 accepted = True
                 break
-        if not accepted:
-            key = first_reason or "not_accepted"
-            reasons[key] = reasons.get(key, 0) + 1
+        if accepted:
+            continue
 
-    return SolverResult(summarize(acc, orders, buses), diagnostics=make_diagnostics(cand_stats, reasons))
+        robust_candidates = available_buses(order, robust_buses)
+        if not robust_candidates:
+            reasons["no_candidate"] = reasons.get("no_candidate", 0) + 1
+            continue
+        robust_candidates.sort(
+            key=lambda bus: order.passengers * z[bus.id]
+            + bus.station_travel_time[order.destination] * order.passengers * (u[bus.id] + q[order.destination])
+        )
+        bus = robust_candidates[0]
+        travel = bus.station_travel_time[order.destination] * order.passengers
+        dual = order.passengers * (z[bus.id] + r[order.destination]) + travel * (u[bus.id] + q[order.destination])
+        reason = rejection_reason(order, bus, sp_r, sx_r, sc_r, bt_r, st_r, dual)
+        if reason == "accepted":
+            commit(order, bus, sp_r, sx_r)
+            acc[order.id] = bus.id
+            z[bus.id] = z[bus.id] * (1 + order.passengers / max(bus.capacity, 1e-9)) + order.priority * eps / (
+                4 * max(bus.capacity, 1e-9)
+            )
+            r[order.destination] = r[order.destination] * (
+                1 + order.passengers / max(sc_r[order.destination], 1e-9)
+            ) + order.priority * eps / (4 * max(sc_r[order.destination], 1e-9))
+            u[bus.id] = u[bus.id] * (1 + travel / max(bt_r[bus.id], 1e-9)) + order.priority * eps / (
+                4 * max(bt_r[bus.id], 1e-9)
+            )
+            q[order.destination] = q[order.destination] * (
+                1 + travel / max(st_r[order.destination], 1e-9)
+            ) + order.priority * eps / (4 * max(st_r[order.destination], 1e-9))
+            accepted = True
+        if not accepted:
+            reasons[reason] = reasons.get(reason, 0) + 1
+
+    return SolverResult(summarize(acc, orders, full_buses), diagnostics=make_diagnostics(cand_stats, reasons))

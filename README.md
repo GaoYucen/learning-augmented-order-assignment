@@ -61,7 +61,7 @@ Run the bottleneck setting:
 python scripts/synthetic_sanity_check.py --setting bottleneck --slots 5 --prediction-scales 1.0 0.75 1.25 0.5 1.5 --thetas 0.2 0.4 0.6 0.8 --output-dir outputs/synthetic_sanity_bottleneck
 ```
 
-The script compares `Random`, `Greedy`, `IPD`, `Prediction-only`, and `RP-LAIPD`. `Prediction-only` follows predictive LP advice directly. `RP-LAIPD` mixes the prediction advice with the original IPD idea; larger `theta` means the algorithm trusts prediction more.
+The script compares `Random`, `Greedy`, `IPD`, `Prediction-only`, and `RP-LAIPD`. `Prediction-only` follows predictive LP advice directly. `RP-LAIPD` follows the resource-partitioned learning-augmented design: `theta` reserves a fraction of each resource for the advice branch, while `1 - theta` is handled by a robust IPD branch.
 
 Generated files:
 
