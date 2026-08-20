@@ -96,7 +96,9 @@ def build_predictive_lp_advice(orders, buses, station_count, cfg, predicted_coun
     return quota
 
 
-def _build_type_bus_advice(orders, buses, station_count, cfg):
+def _build_type_bus_advice(orders, buses, station_count, cfg, advice=None):
+    if advice is not None:
+        return advice
     return build_predictive_lp_advice(orders, buses, station_count, cfg)
 
 
@@ -104,7 +106,7 @@ def _quota_remaining(order, bus, used_quota, advice):
     return advice.get((order.destination, bus.id), 0.0) - used_quota[(order.destination, bus.id)]
 
 
-def prediction_only_dispatch(orders, buses, station_count, cfg):
+def prediction_only_dispatch(orders, buses, station_count, cfg, advice=None):
     """Dispatch by following predicted type-to-bus quota as much as possible."""
     buses = clone_buses(buses)
     sc, bt, st = limits(orders, buses, station_count, cfg)
@@ -113,7 +115,7 @@ def prediction_only_dispatch(orders, buses, station_count, cfg):
     acc = {}
     reasons = {}
     used_quota = defaultdict(float)
-    advice = _build_type_bus_advice(orders, buses, station_count, cfg)
+    advice = _build_type_bus_advice(orders, buses, station_count, cfg, advice=advice)
     cand_stats = candidate_stats(orders, buses)
 
     for order in orders:
@@ -145,7 +147,7 @@ def prediction_only_dispatch(orders, buses, station_count, cfg):
     return SolverResult(summarize(acc, orders, buses), diagnostics=make_diagnostics(cand_stats, reasons))
 
 
-def rp_laipd_dispatch(orders, buses, station_count, cfg):
+def rp_laipd_dispatch(orders, buses, station_count, cfg, advice=None):
     """Learning-augmented IPD with a quota-aware prediction branch.
 
     theta controls how much the method trusts prediction advice:
@@ -167,7 +169,7 @@ def rp_laipd_dispatch(orders, buses, station_count, cfg):
     acc = {}
     reasons = {}
     used_quota = defaultdict(float)
-    advice = _build_type_bus_advice(orders, buses, station_count, cfg)
+    advice = _build_type_bus_advice(orders, buses, station_count, cfg, advice=advice)
     cand_stats = candidate_stats(orders, buses)
 
     for order in orders:

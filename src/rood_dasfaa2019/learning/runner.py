@@ -98,13 +98,13 @@ def run_learning_augmented_instance(
         rows.append(dispatch_row(slot_id, "Greedy", "", scale, corruption, strength, pred_error, adv_error, orders, greedy_result, opt_result, greedy_ms))
         rows.append(dispatch_row(slot_id, "IPD", "", scale, corruption, strength, pred_error, adv_error, orders, ipd_result, opt_result, ipd_ms))
 
-        result, elapsed_ms = timed(lambda: prediction_only_dispatch(orders, buses, station_count, scaled_cfg))
+        result, elapsed_ms = timed(lambda: prediction_only_dispatch(orders, buses, station_count, scaled_cfg, advice=advice))
         rows.append(dispatch_row(slot_id, "Prediction-only", "", scale, corruption, strength, pred_error, adv_error, orders, result, opt_result, elapsed_ms))
 
         for theta in thetas:
             theta_cfg = dict(scaled_cfg)
             theta_cfg["theta"] = theta
-            result, elapsed_ms = timed(lambda: rp_laipd_dispatch(orders, buses, station_count, theta_cfg))
+            result, elapsed_ms = timed(lambda: rp_laipd_dispatch(orders, buses, station_count, theta_cfg, advice=advice))
             rows.append(dispatch_row(slot_id, "RP-LAIPD", theta, scale, corruption, strength, pred_error, adv_error, orders, result, opt_result, elapsed_ms))
 
     return rows

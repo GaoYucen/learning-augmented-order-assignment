@@ -74,9 +74,23 @@ For Student A's A1/A2 tasks, this is a synthetic sanity-check, not the final rea
 Core learning-augmented modules:
 
 - `src/rood_dasfaa2019/learning/request_types.py`: maps each order to a request type. The current definition uses destination station.
-- `src/rood_dasfaa2019/learning/prediction.py`: provides the synthetic prediction provider used before a real predictor is integrated.
+- `src/rood_dasfaa2019/learning/prediction.py`: provides the synthetic prediction provider and adapter classes for B-side prediction tables with `slot_id`, `type_id`, and `predicted_count`.
 - `src/rood_dasfaa2019/learning/metrics.py`: computes prediction error, advice error, ALG/OPT rows, and grouped summaries.
 - `src/rood_dasfaa2019/learning/runner.py`: provides the unified experiment runner for Random, Greedy, IPD, Prediction-only, and RP-LAIPD, and accepts an external predictor.
+
+B-side prediction handoff format:
+
+```text
+slot_id, type_id, predicted_count
+```
+
+If multiple prediction models are stored in the same file, include a `model` column. The A-side adapter converts one slot into:
+
+```python
+{type_id: predicted_count}
+```
+
+and passes it to the predictive LP and RP-LAIPD without merging the B-side branch first.
 
 ## Repository layout
 
