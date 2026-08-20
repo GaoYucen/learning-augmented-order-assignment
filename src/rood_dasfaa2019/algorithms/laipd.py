@@ -11,21 +11,18 @@ from rood_dasfaa2019.learning.prediction import SyntheticPredictionProvider
 from .common import *
 
 
-def _predicted_type_counts(orders, station_count, cfg):
-    """Return type-level demand advice n_hat_k.
-
-    The first implementation keeps this self-contained for synthetic sanity
-    checks: it starts from realized type counts and corrupts them with a simple
-    scaling factor. Later this can be replaced by an external predictor.
-    """
+def _predicted_type_counts(orders, station_count, cfg, predicted_counts=None):
+    """Return type-level demand advice n_hat_k."""
+    if predicted_counts is not None:
+        return {station: float(predicted_counts.get(station, 0.0)) for station in range(station_count)}
     advice_cfg = dict(cfg)
     advice_cfg.setdefault("prediction_floor", 1.0)
     return SyntheticPredictionProvider(advice_cfg).predict(orders, station_count)
 
 
-def build_predictive_lp_advice(orders, buses, station_count, cfg):
+def build_predictive_lp_advice(orders, buses, station_count, cfg, predicted_counts=None):
     """Solve the predictive LP and return type-to-bus quotas y_hat_kj."""
-    predicted = _predicted_type_counts(orders, station_count, cfg)
+    predicted = _predicted_type_counts(orders, station_count, cfg, predicted_counts=predicted_counts)
     avg_priority = {v: 0.0 for v in range(station_count)}
     type_counts = {v: 0 for v in range(station_count)}
     for order in orders:

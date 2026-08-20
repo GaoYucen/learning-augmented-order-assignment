@@ -1,8 +1,14 @@
 from __future__ import annotations
 
+from typing import Protocol
+
 from rood_dasfaa2019.simulation.entities import Order
 
 from .request_types import type_counts
+
+
+class TypeDemandPredictor(Protocol):
+    def predict(self, orders: list[Order], type_count: int) -> dict[int, float]: ...
 
 
 class SyntheticPredictionProvider:
@@ -56,4 +62,3 @@ class SyntheticPredictionProvider:
             corrupted[source] = 0.0
         corrupted[target] += moved
         return corrupted
-

@@ -76,7 +76,7 @@ Core learning-augmented modules:
 - `src/rood_dasfaa2019/learning/request_types.py`: maps each order to a request type. The current definition uses destination station.
 - `src/rood_dasfaa2019/learning/prediction.py`: provides the synthetic prediction provider used before a real predictor is integrated.
 - `src/rood_dasfaa2019/learning/metrics.py`: computes prediction error, advice error, ALG/OPT rows, and grouped summaries.
-- `src/rood_dasfaa2019/learning/runner.py`: provides the unified experiment runner for Random, Greedy, IPD, Prediction-only, and RP-LAIPD.
+- `src/rood_dasfaa2019/learning/runner.py`: provides the unified experiment runner for Random, Greedy, IPD, Prediction-only, and RP-LAIPD, and accepts an external predictor.
 
 ## Repository layout
 
