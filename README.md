@@ -92,6 +92,21 @@ If multiple prediction models are stored in the same file, include a `model` col
 
 and passes it to the predictive LP and RP-LAIPD without merging the B-side branch first.
 
+## A3 consistency-robustness frontier
+
+After RP-LAIPD is aligned with the resource-partitioned design, run the A3 experiment:
+
+```bash
+python scripts/run_consistency_robustness.py --slots 5 --thetas 0.0 0.2 0.4 0.6 0.8 0.9 --output-dir outputs/consistency_robustness
+```
+
+Generated files:
+
+- `consistency_robustness_raw.csv`: raw rows for accurate and corrupted prediction scenarios.
+- `consistency_robustness_scenarios.csv`: per-theta performance under each robustness scenario.
+- `consistency_robustness_frontier.csv`: one row per theta with consistency and robustness values.
+- `consistency_robustness_frontier.png`: Pareto frontier plot.
+
 ## Repository layout
 
 ```text
