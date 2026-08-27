@@ -17,7 +17,7 @@ def plot_sanity(df: pd.DataFrame, path: Path) -> None:
     fig, ax = plt.subplots(figsize=(10, 6), dpi=180)
     plot_df = df.copy()
     plot_df["curve"] = plot_df.apply(
-        lambda row: f"RP-LAIPD theta={row['theta']}" if row["method"] == "RP-LAIPD" else row["method"],
+        lambda row: f"RP-LAIPD theta={row['theta']} (robust)" if row["method"] == "RP-LAIPD" else row["method"],
         axis=1,
     )
     grouped = plot_df.groupby(["curve", "prediction_error"], as_index=False)["alg_over_opt"].mean()
@@ -58,7 +58,13 @@ def main():
         nargs="+",
         default=[0.0, 0.25, 0.5, 0.75],
     )
-    parser.add_argument("--thetas", type=float, nargs="+", default=[0.2, 0.4, 0.6, 0.8])
+    parser.add_argument(
+        "--thetas",
+        type=float,
+        nargs="+",
+        default=[0.2, 0.4, 0.6, 0.8],
+        help="Robust IPD resource fractions. theta=1 ignores prediction; theta=0 follows advice.",
+    )
     args = parser.parse_args()
 
     cfg = load_experiment(args.experiment)

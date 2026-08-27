@@ -106,6 +106,14 @@ def plot_frontier(frontier: pd.DataFrame, path: Path) -> None:
     ax.set_title("Consistency-Robustness Frontier")
     ax.set_xlabel("Consistency: ALG/OPT under accurate prediction")
     ax.set_ylabel("Robustness: worst-case ALG/OPT under corrupted prediction")
+    ax.text(
+        0.01,
+        0.01,
+        "theta = robust IPD resource share; larger theta trusts prediction less",
+        transform=ax.transAxes,
+        fontsize=7,
+        color="dimgray",
+    )
     ax.grid(alpha=0.25)
     fig.tight_layout()
     fig.savefig(path)
@@ -118,7 +126,13 @@ def main() -> None:
     parser.add_argument("--seed", type=int, default=2019)
     parser.add_argument("--slots", type=int, default=5)
     parser.add_argument("--output-dir", type=Path, default=Path("outputs") / "consistency_robustness")
-    parser.add_argument("--thetas", type=float, nargs="+", default=[0.0, 0.2, 0.4, 0.6, 0.8, 0.9])
+    parser.add_argument(
+        "--thetas",
+        type=float,
+        nargs="+",
+        default=[0.0, 0.1, 0.2, 0.4, 0.6, 0.8, 1.0],
+        help="Robust IPD resource fractions. theta=1 ignores prediction; theta=0 follows advice.",
+    )
     args = parser.parse_args()
 
     cfg = apply_bottleneck_config(load_experiment(args.experiment))

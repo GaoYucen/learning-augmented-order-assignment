@@ -45,9 +45,9 @@ def test_rp_laipd_resource_partition_extremes():
     stations, orders, buses = generate_instance(c, 9)
 
     ipd = ipd_dispatch(orders, buses, len(stations), c)
-    rp_robust = rp_laipd_dispatch(orders, buses, len(stations), {**c, "theta": 0.0})
+    rp_robust = rp_laipd_dispatch(orders, buses, len(stations), {**c, "theta": 1.0})
     prediction_only = prediction_only_dispatch(orders, buses, len(stations), c)
-    rp_advice = rp_laipd_dispatch(orders, buses, len(stations), {**c, "theta": 1.0})
+    rp_advice = rp_laipd_dispatch(orders, buses, len(stations), {**c, "theta": 0.0})
 
     assert rp_robust.accepted == ipd.accepted
     assert rp_robust.objective == ipd.objective

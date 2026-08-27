@@ -170,21 +170,22 @@ def prediction_only_dispatch(orders, buses, station_count, cfg, advice=None):
 def rp_laipd_dispatch(orders, buses, station_count, cfg, advice=None):
     """Resource-partitioned learning-augmented IPD.
 
-    theta partitions every resource into an advice branch and a robust branch:
-    bP = theta * b and bR = (1 - theta) * b. Advice decisions consume only
-    bP, while rejected advice requests fall back to an independent IPD state on
-    bR. This matches the journal-draft RP-LAIPD structure and keeps arbitrary
-    advice from corrupting the robust branch.
+    theta follows the robustness-oriented convention used in the
+    learning-augmented online algorithms literature: theta is the resource
+    fraction reserved for the robust IPD branch. Thus theta=1 ignores advice
+    and recovers IPD, while theta=0 follows the predictive advice branch.
     """
     eps = float(cfg.get("epsilon", 0.2))
     theta = float(cfg.get("theta", 0.5))
     theta = min(max(theta, 0.0), 1.0)
+    robust_fraction = theta
+    advice_fraction = 1.0 - theta
 
     full_buses = clone_buses(buses)
-    advice_buses = _scaled_buses(buses, theta)
-    robust_buses = _scaled_buses(buses, 1.0 - theta)
-    advice_cfg = _scaled_resource_cfg(orders, full_buses, station_count, cfg, theta)
-    robust_cfg = _scaled_resource_cfg(orders, full_buses, station_count, cfg, 1.0 - theta)
+    advice_buses = _scaled_buses(buses, advice_fraction)
+    robust_buses = _scaled_buses(buses, robust_fraction)
+    advice_cfg = _scaled_resource_cfg(orders, full_buses, station_count, cfg, advice_fraction)
+    robust_cfg = _scaled_resource_cfg(orders, full_buses, station_count, cfg, robust_fraction)
 
     sc_p, bt_p, st_p = limits(orders, advice_buses, station_count, advice_cfg)
     sp_p = {v: 0 for v in range(station_count)}
@@ -201,7 +202,7 @@ def rp_laipd_dispatch(orders, buses, station_count, cfg, advice=None):
     acc = {}
     reasons = {}
     used_quota = defaultdict(float)
-    advice = _scaled_advice(_build_type_bus_advice(orders, full_buses, station_count, cfg, advice=advice), theta)
+    advice = _scaled_advice(_build_type_bus_advice(orders, full_buses, station_count, cfg, advice=advice), advice_fraction)
     cand_stats = candidate_stats(orders, full_buses)
 
     for order in orders:

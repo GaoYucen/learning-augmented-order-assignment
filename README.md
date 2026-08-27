@@ -61,7 +61,7 @@ Run the bottleneck setting:
 python scripts/synthetic_sanity_check.py --setting bottleneck --slots 5 --prediction-scales 1.0 0.75 1.25 0.5 1.5 --thetas 0.2 0.4 0.6 0.8 --output-dir outputs/synthetic_sanity_bottleneck
 ```
 
-The script compares `Random`, `Greedy`, `IPD`, `Prediction-only`, and `RP-LAIPD`. `Prediction-only` follows predictive LP advice directly. `RP-LAIPD` follows the resource-partitioned learning-augmented design: `theta` reserves a fraction of each resource for the advice branch, while `1 - theta` is handled by a robust IPD branch.
+The script compares `Random`, `Greedy`, `IPD`, `Prediction-only`, and `RP-LAIPD`. `Prediction-only` follows predictive LP advice directly. `RP-LAIPD` follows the resource-partitioned learning-augmented design. Following the robustness-oriented convention in the learning-augmented online algorithms literature, `theta` is the fraction of each resource reserved for the robust IPD branch, while `1 - theta` is exposed to the prediction advice branch. Therefore `theta=1` ignores prediction and recovers IPD, and `theta=0` follows prediction advice.
 
 Generated files:
 
@@ -97,7 +97,7 @@ and passes it to the predictive LP and RP-LAIPD without merging the B-side branc
 After RP-LAIPD is aligned with the resource-partitioned design, run the A3 experiment:
 
 ```bash
-python scripts/run_consistency_robustness.py --slots 5 --thetas 0.0 0.2 0.4 0.6 0.8 0.9 --output-dir outputs/consistency_robustness
+python scripts/run_consistency_robustness.py --slots 5 --thetas 0.0 0.1 0.2 0.4 0.6 0.8 1.0 --output-dir outputs/consistency_robustness
 ```
 
 Generated files:
