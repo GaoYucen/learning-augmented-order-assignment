@@ -170,10 +170,9 @@ def prediction_only_dispatch(orders, buses, station_count, cfg, advice=None):
 def rp_laipd_dispatch(orders, buses, station_count, cfg, advice=None):
     """Resource-partitioned learning-augmented IPD.
 
-    theta follows the robustness-oriented convention used in the
-    learning-augmented online algorithms literature: theta is the resource
-    fraction reserved for the robust IPD branch. Thus theta=1 ignores advice
-    and recovers IPD, while theta=0 follows the predictive advice branch.
+    The revised draft defines theta as the robust/IPD resource fraction:
+    b_R = theta * b and b_P = (1 - theta) * b. Thus theta=1 ignores
+    prediction and recovers IPD, while theta=0 follows predictive advice.
     """
     eps = float(cfg.get("epsilon", 0.2))
     theta = float(cfg.get("theta", 0.5))

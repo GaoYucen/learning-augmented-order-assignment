@@ -267,7 +267,7 @@ def build_markdown() -> None:
 ## 一句话结论
 
 目前 A1/A2/A3 已经形成了可运行的学习增强订单分配实验框架，并能在合成预测误差下观察到 theta 带来的 consistency-robustness trade-off。
-这里 theta 已统一为鲁棒 IPD 分支资源比例：theta=1 表示完全不信预测，theta=0 表示完全依赖预测 advice。
+这里 theta 已按导师新草稿统一为鲁棒 IPD 分支资源比例：theta=1 表示完全不信预测并退化为 robust IPD，theta=0 表示完全依赖预测 advice。
 但是这些结果仍基于 synthetic prediction / artificial corruption，尚未接入师姐的真实预测器，因此只能作为框架验证和讨论依据，不能作为最终论文结论。
 
 ## 目前完成了什么
@@ -275,7 +275,7 @@ def build_markdown() -> None:
 - A1：统一了 request type、资源约束、feasible bus、offline OPT、prediction error、advice error 以及算法调用接口。
 - A2：建立 synthetic sanity-check，用可控预测误差检查 Prediction-only、IPD、RP-LAIPD 等方法是否能跑通。
 - A3：建立 consistency-robustness frontier 实验，扫描 theta，观察预测准确时的收益和预测错误时的退化。
-- RP-LAIPD 已统一为老师口径和经典 learning-augmented 文献习惯：theta 份资源给 robust IPD branch，1-theta 份资源给 advice branch。
+- RP-LAIPD 已统一为导师新草稿的符号：theta 份资源给 robust IPD branch，1-theta 份资源给 advice branch。
 
 ## 关键实验结果
 

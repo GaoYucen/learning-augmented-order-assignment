@@ -63,7 +63,7 @@ def main():
         type=float,
         nargs="+",
         default=[0.2, 0.4, 0.6, 0.8],
-        help="Robust IPD resource fractions. theta=1 ignores prediction; theta=0 follows advice.",
+        help="Robust/IPD resource fractions from the revised draft. theta=1 ignores prediction; theta=0 follows advice.",
     )
     args = parser.parse_args()
 
