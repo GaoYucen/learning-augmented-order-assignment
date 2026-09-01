@@ -99,23 +99,44 @@ def build_frontier(raw: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
 
 
 def plot_frontier(frontier: pd.DataFrame, path: Path) -> None:
-    fig, ax = plt.subplots(figsize=(7, 5), dpi=180)
-    ax.plot(frontier["consistency"], frontier["robustness"], marker="o", linewidth=1.8)
-    for row in frontier.itertuples():
-        ax.annotate(f"theta={row.theta:g}", (row.consistency, row.robustness), xytext=(5, 4), textcoords="offset points", fontsize=8)
+    fig, ax = plt.subplots(figsize=(8, 5.5), dpi=180)
+    plot_df = frontier.sort_values("theta")
+    ax.plot(plot_df["consistency"], plot_df["robustness"], marker="o", linewidth=1.8)
+    offsets = {
+        0.0: (-38, -2),
+        0.1: (8, 14),
+        0.2: (8, -18),
+        0.4: (8, 14),
+        0.6: (8, 14),
+        0.8: (8, 10),
+        1.0: (8, 10),
+    }
+    for row in plot_df.itertuples():
+        dx, dy = offsets.get(round(float(row.theta), 1), (8, 6))
+        ax.annotate(
+            f"theta={row.theta:g}",
+            (row.consistency, row.robustness),
+            xytext=(dx, dy),
+            textcoords="offset points",
+            fontsize=8,
+            ha="right" if dx < 0 else "left",
+            va="top" if dy < 0 else "bottom",
+            bbox={"boxstyle": "round,pad=0.18", "fc": "white", "ec": "none", "alpha": 0.85},
+            arrowprops={"arrowstyle": "-", "color": "0.45", "lw": 0.6, "shrinkA": 0, "shrinkB": 4},
+        )
     ax.set_title("Consistency-Robustness Frontier")
     ax.set_xlabel("Consistency: ALG/OPT under accurate prediction")
     ax.set_ylabel("Robustness: worst-case ALG/OPT under corrupted prediction")
-    ax.text(
-        0.01,
-        0.01,
+    fig.text(
+        0.08,
+        0.02,
         "theta = robust IPD resource share; larger theta trusts prediction less",
-        transform=ax.transAxes,
         fontsize=7,
         color="dimgray",
     )
     ax.grid(alpha=0.25)
-    fig.tight_layout()
+    ax.margins(x=0.08, y=0.18)
+    fig.tight_layout(rect=(0, 0.04, 1, 1))
     fig.savefig(path)
     plt.close(fig)
 
