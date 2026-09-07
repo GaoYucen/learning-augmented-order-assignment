@@ -13,7 +13,7 @@ from rood_dasfaa2019.experiments import ChengduExperimentContext, run_chengdu_sl
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run learning-augmented dispatch on prepared Chengdu slots.")
     parser.add_argument("--config", type=Path, default=Path("configs/chengdu.yaml"))
-    parser.add_argument("--model", default="HistGradientBoosting")
+    parser.add_argument("--model", default="HGB")
     parser.add_argument("--split", choices=["validation", "test", "shifted_test"], default="test")
     parser.add_argument("--slots", type=int, default=3)
     parser.add_argument("--corruption", choices=["none", "scale", "permutation", "temporal_shift", "scarce_resource"], default="none")

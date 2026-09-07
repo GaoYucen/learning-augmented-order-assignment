@@ -23,7 +23,7 @@ SCENARIOS = {
 def main() -> None:
     parser = argparse.ArgumentParser(description="B3 controlled distribution-shift experiments.")
     parser.add_argument("--config", type=Path, default=Path("configs/chengdu.yaml"))
-    parser.add_argument("--model", default="HistGradientBoosting")
+    parser.add_argument("--model", default="HGB")
     parser.add_argument("--split", choices=["test", "shifted_test"], default="test")
     parser.add_argument("--slots", type=int, default=6)
     parser.add_argument("--seeds", type=int, nargs="+")

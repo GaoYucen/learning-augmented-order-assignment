@@ -3,6 +3,7 @@ from rood_dasfaa2019.algorithms import (
     random_dispatch,
     greedy_dispatch,
     ipd_dispatch,
+    offline_opt,
     prediction_only_dispatch,
     rp_laipd_dispatch,
 )
@@ -53,3 +54,13 @@ def test_rp_laipd_resource_partition_extremes():
     assert rp_robust.objective == ipd.objective
     assert rp_advice.accepted == prediction_only.accepted
     assert rp_advice.objective == prediction_only.objective
+
+
+def test_algorithms_handle_empty_order_slot():
+    c = cfg()
+    stations, _, buses = generate_instance(c, 11)
+    for fn in (offline_opt, ipd_dispatch, prediction_only_dispatch, rp_laipd_dispatch):
+        result = fn([], buses, len(stations), c)
+        assert result.accepted == {}
+        assert result.objective == 0.0
+        assert result.passengers == 0

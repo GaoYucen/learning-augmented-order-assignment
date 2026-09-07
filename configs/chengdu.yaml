@@ -36,10 +36,20 @@ experiment:
 
 prediction:
   seasonal_period: 48
-  ridge_alpha: 1.0
-  lag_steps: [1, 2, 48, 96, 336]
-  gradient_boosting_max_iter: 100
-  gradient_boosting_max_depth: 6
-  gradient_boosting_learning_rate: 0.05
-  checkpoint_iterations: [1, 2, 5, 10, 20, 50, 100, 200]
-  checkpoint_test_slots: 12
+  horizons: [1, 2, 4, 8]
+  origin_lags: [0, 1, 47, 95, 335]
+  ridge_alpha_grid: [0.01, 0.1, 1, 10, 100]
+  historical_fine_weight_grid: [0, 0.25, 0.5, 0.75, 1]
+  hgb_max_iter_grid: [25, 50, 100, 200]
+  hgb_losses: ["squared_error", "poisson"]
+  hgb_max_depth: 6
+  hgb_learning_rate: 0.05
+  bootstrap_repetitions: 2000
+
+theta_error_experiment:
+  predictor_horizon: 1
+  lambdas: [0, 0.25, 0.5, 1, 2, 4]
+  perturbation_seeds: [3101, 3102, 3103, 3104, 3105, 3106, 3107, 3108, 3109, 3110]
+  thetas: [0, 0.2, 0.4, 0.6, 0.8, 1]
+  test_slot_count: 12
+  opt_gap_tolerance: 1.0e-9

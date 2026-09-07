@@ -228,7 +228,10 @@ def run_chengdu_slot(
 ) -> list[dict]:
     prep_start = perf_counter()
     orders = context.slot_orders(slot_id)
-    split = str(context.orders.loc[context.orders["slot_id"] == slot_id, "split"].iloc[0])
+    split_rows = context.demand.loc[context.demand["slot_id"].eq(slot_id), "split"]
+    if split_rows.empty:
+        raise KeyError(f"Unknown slot_id: {slot_id}")
+    split = str(split_rows.iloc[0])
     prep_ms = (perf_counter() - prep_start) * 1000.0
     predicted, prediction_ms = _timed(lambda: context.corrupt_prediction(slot_id, model, corruption, level, seed))
     advice, lp_ms = _timed(
