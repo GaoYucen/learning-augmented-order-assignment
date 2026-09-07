@@ -83,6 +83,12 @@ def source_station_time(station_id: int, buses: list[Bus], default: float = 0.0)
 
 
 def limits(orders: list[Order], buses: list[Bus], station_count: int, cfg: dict):
+    if 'station_capacity' in cfg and 'bus_time_capacity' in cfg and 'station_time_capacity' in cfg:
+        return (
+            dict(cfg['station_capacity']),
+            dict(cfg['bus_time_capacity']),
+            dict(cfg['station_time_capacity']),
+        )
     total_capacity=sum(b.capacity for b in buses)
     demand=[0]*station_count
     for o in orders: demand[o.destination]+=o.passengers

@@ -14,7 +14,8 @@ from rood_dasfaa2019.algorithms.laipd import build_predictive_lp_advice
 from rood_dasfaa2019.simulation.entities import Bus, Order, Station
 from rood_dasfaa2019.simulation.generator import generate_instance
 
-from .metrics import advice_error, dispatch_row, opt_type_bus_allocation, synthetic_prediction_error
+from .metrics import advice_error, dispatch_row, opt_type_bus_allocation, prediction_error
+from .prediction import SyntheticPredictionProvider, TypeDemandPredictor
 
 
 def timed(fn):
@@ -37,6 +38,7 @@ def run_learning_augmented_slot(
     corruption: str,
     thetas: list[float],
     slot_id: int,
+    predictor: TypeDemandPredictor | None = None,
 ) -> list[dict]:
     stations, orders, buses = generate_instance(cfg, seed)
     return run_learning_augmented_instance(
@@ -50,6 +52,7 @@ def run_learning_augmented_slot(
         corruption,
         thetas,
         slot_id,
+        predictor=predictor,
     )
 
 
@@ -64,6 +67,7 @@ def run_learning_augmented_instance(
     corruption: str,
     thetas: list[float],
     slot_id: int,
+    predictor: TypeDemandPredictor | None = None,
 ) -> list[dict]:
     station_count = len(stations)
     opt_result, _ = timed(lambda: offline_opt(orders, buses, station_count, cfg))
@@ -79,21 +83,28 @@ def run_learning_augmented_instance(
         scaled_cfg["prediction_scale"] = scale
         scaled_cfg["prediction_corruption"] = corruption
         scaled_cfg["corruption_strength"] = strength
-        advice = build_predictive_lp_advice(orders, buses, station_count, scaled_cfg)
-        pred_error = synthetic_prediction_error(orders, station_count, scaled_cfg)
+        local_predictor = predictor or SyntheticPredictionProvider(scaled_cfg)
+        predicted_counts = local_predictor.predict(orders, station_count)
+        advice = build_predictive_lp_advice(
+            orders,
+            buses,
+            station_count,
+            scaled_cfg,
+            predicted_counts=predicted_counts,
+        )
+        pred_error = prediction_error(orders, station_count, predicted_counts)
         adv_error = advice_error(advice, opt_allocation)
         rows.append(dispatch_row(slot_id, "Random", "", scale, corruption, strength, pred_error, adv_error, orders, random_result, opt_result, random_ms))
         rows.append(dispatch_row(slot_id, "Greedy", "", scale, corruption, strength, pred_error, adv_error, orders, greedy_result, opt_result, greedy_ms))
         rows.append(dispatch_row(slot_id, "IPD", "", scale, corruption, strength, pred_error, adv_error, orders, ipd_result, opt_result, ipd_ms))
 
-        result, elapsed_ms = timed(lambda: prediction_only_dispatch(orders, buses, station_count, scaled_cfg))
+        result, elapsed_ms = timed(lambda: prediction_only_dispatch(orders, buses, station_count, scaled_cfg, advice=advice))
         rows.append(dispatch_row(slot_id, "Prediction-only", "", scale, corruption, strength, pred_error, adv_error, orders, result, opt_result, elapsed_ms))
 
         for theta in thetas:
             theta_cfg = dict(scaled_cfg)
             theta_cfg["theta"] = theta
-            result, elapsed_ms = timed(lambda: rp_laipd_dispatch(orders, buses, station_count, theta_cfg))
+            result, elapsed_ms = timed(lambda: rp_laipd_dispatch(orders, buses, station_count, theta_cfg, advice=advice))
             rows.append(dispatch_row(slot_id, "RP-LAIPD", theta, scale, corruption, strength, pred_error, adv_error, orders, result, opt_result, elapsed_ms))
 
     return rows
-

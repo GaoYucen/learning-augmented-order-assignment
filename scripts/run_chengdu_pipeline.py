@@ -13,7 +13,7 @@ def run(script: str, *args: str) -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Reproduce Student B's B0-B6 Chengdu pipeline.")
+    parser = argparse.ArgumentParser(description="Prepare Chengdu data and generate the two final figures.")
     parser.add_argument("--skip-data", action="store_true", help="Reuse prepared B1 files.")
     parser.add_argument("--skip-prediction", action="store_true", help="Reuse trained B2 predictions.")
     args = parser.parse_args()
@@ -22,14 +22,7 @@ def main() -> None:
     if not args.skip_prediction:
         run("train_chengdu_predictions.py")
         run("train_checkpoint_predictions.py")
-    run("export_chengdu_supply.py")
-    run("run_prediction_diagnostics.py")
-    run("run_checkpoint_dispatch.py")
-    run("run_distribution_shift.py")
-    run("build_ablation_results.py")
-    run("run_runtime_scalability.py")
-    run("plot_paper_figures.py")
-    run("plot_checkpoint_experiment.py")
+    run("run_final_prediction_theta_figures.py")
 
 
 if __name__ == "__main__":

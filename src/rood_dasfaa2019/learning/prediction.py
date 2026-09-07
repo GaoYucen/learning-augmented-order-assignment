@@ -1,8 +1,79 @@
 from __future__ import annotations
 
+from pathlib import Path
+from typing import Protocol
+
+import pandas as pd
+
 from rood_dasfaa2019.simulation.entities import Order
 
 from .request_types import type_counts
+
+
+class TypeDemandPredictor(Protocol):
+    def predict(self, orders: list[Order], type_count: int) -> dict[int, float]: ...
+
+
+class SlotTypeDemandProvider(Protocol):
+    def predict_slot(self, slot_id: str) -> dict[int, float]: ...
+
+
+class StaticPredictionProvider:
+    """Fixed prediction provider for tests and adapter handoff.
+
+    The expected shape is the same as the B-side predictor output:
+    {request_type_id: predicted_count}.
+    """
+
+    def __init__(self, predicted_counts: dict[int, float]):
+        self.predicted_counts = {int(key): max(float(value), 0.0) for key, value in predicted_counts.items()}
+
+    def predict(self, orders: list[Order], type_count: int) -> dict[int, float]:
+        return {request_type_id: self.predicted_counts.get(request_type_id, 0.0) for request_type_id in range(type_count)}
+
+
+class SlotPredictionAdapter:
+    """Bind a slot-level prediction provider to the runner predictor interface."""
+
+    def __init__(self, provider: SlotTypeDemandProvider, slot_id: str):
+        self.provider = provider
+        self.slot_id = slot_id
+
+    def predict(self, orders: list[Order], type_count: int) -> dict[int, float]:
+        raw = self.provider.predict_slot(self.slot_id)
+        return {request_type_id: max(float(raw.get(request_type_id, 0.0)), 0.0) for request_type_id in range(type_count)}
+
+
+class PredictionFrameProvider:
+    """Read B-side prediction rows and expose predict_slot(slot_id).
+
+    Required columns: slot_id, type_id, predicted_count.
+    Optional column: model. If model is set on the provider, rows are filtered
+    to that prediction model.
+    """
+
+    def __init__(self, predictions: pd.DataFrame, model: str | None = None):
+        required = {"slot_id", "type_id", "predicted_count"}
+        missing = required - set(predictions.columns)
+        if missing:
+            raise ValueError(f"Prediction table is missing columns: {sorted(missing)}")
+        if model is not None and "model" not in predictions.columns:
+            raise ValueError("Prediction table must contain a model column when model is specified")
+        self.predictions = predictions.copy()
+        self.predictions["slot_id"] = self.predictions["slot_id"].astype(str)
+        self.model = model
+
+    @classmethod
+    def from_csv(cls, path: Path | str, model: str | None = None) -> "PredictionFrameProvider":
+        return cls(pd.read_csv(path), model=model)
+
+    def predict_slot(self, slot_id: str) -> dict[int, float]:
+        selected = self.predictions.loc[self.predictions["slot_id"] == str(slot_id)]
+        if self.model is not None:
+            selected = selected.loc[selected["model"] == self.model]
+        if selected.empty:
+            raise KeyError(f"No predictions for slot={slot_id!r}, model={self.model!r}")
+        return {int(row.type_id): max(float(row.predicted_count), 0.0) for row in selected.itertuples()}
 
 
 class SyntheticPredictionProvider:
@@ -56,4 +127,3 @@ class SyntheticPredictionProvider:
             corrupted[source] = 0.0
         corrupted[target] += moved
         return corrupted
-
