@@ -43,6 +43,7 @@ class ChengduExperimentContext:
     buses: list[Bus]
     algorithm_cfg: dict
     type_values: dict[int, float]
+    type_passengers: dict[int, float]
     high_value_threshold: float
 
     @classmethod
@@ -133,8 +134,22 @@ class ChengduExperimentContext:
         type_values = (
             train_orders.groupby("station_id")["priority"].mean().reindex(range(len(stations)), fill_value=train_orders["priority"].mean()).to_dict()
         )
+        type_passengers = (
+            train_orders.groupby("station_id")["party_size"].mean().reindex(range(len(stations)), fill_value=train_orders["party_size"].mean()).to_dict()
+        )
         high_value_threshold = float(train_orders["priority"].quantile(float(exp_cfg["high_value_quantile"])))
-        return cls(config, orders, demand, predictions, stations, buses, algorithm_cfg, type_values, high_value_threshold)
+        return cls(
+            config,
+            orders,
+            demand,
+            predictions,
+            stations,
+            buses,
+            algorithm_cfg,
+            type_values,
+            type_passengers,
+            high_value_threshold,
+        )
 
     def slot_orders(self, slot_id: str) -> list[Order]:
         selected = self.orders.loc[self.orders["slot_id"] == slot_id].sort_values(["arrival_minute", "request_id"])

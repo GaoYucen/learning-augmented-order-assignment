@@ -3,3 +3,4 @@ from .fpd import fpd_dispatch
 from .ipd import ipd_dispatch, ipd_paper_dispatch
 from .laipd import prediction_only_dispatch, rp_laipd_dispatch
 from .opt import offline_opt
+from .static_lp import static_bid_price_dispatch
