@@ -34,7 +34,8 @@ def offline_opt(orders,buses,station_count,cfg):
         else:
             for k in row:A[i,k]=1
     c=-np.array([o.priority for o,b in pairs])
-    res=milp(c,integrality=np.ones(len(pairs)),bounds=Bounds(0,1),constraints=LinearConstraint(A.tocsr(),-np.inf,np.array(ub)),options={'time_limit':30})
+    time_limit=float(cfg.get('opt_time_limit_seconds',30))
+    res=milp(c,integrality=np.ones(len(pairs)),bounds=Bounds(0,1),constraints=LinearConstraint(A.tocsr(),-np.inf,np.array(ub)),options={'time_limit':time_limit})
     x=np.zeros(len(pairs)) if res.x is None else res.x
     acc={pairs[k][0].id:pairs[k][1].id for k,val in enumerate(x) if val>0.5}
     obj=sum(pairs[k][0].priority for k,val in enumerate(x) if val>0.5)
@@ -46,4 +47,7 @@ def offline_opt(orders,buses,station_count,cfg):
         solver_success=bool(getattr(res,'success',False)),
         solver_time_limit_hit='time limit' in str(getattr(res,'message','')).lower(),
         solver_message=str(getattr(res,'message','')),
+        solver_dual_bound=float(getattr(res,'mip_dual_bound',np.nan)) if getattr(res,'mip_dual_bound',None) is not None else None,
+        solver_mip_gap=float(getattr(res,'mip_gap',np.nan)) if getattr(res,'mip_gap',None) is not None else None,
+        solver_node_count=int(getattr(res,'mip_node_count',0)) if getattr(res,'mip_node_count',None) is not None else None,
     )
