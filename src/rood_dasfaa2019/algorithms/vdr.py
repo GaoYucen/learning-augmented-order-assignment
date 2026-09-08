@@ -202,7 +202,7 @@ def vdr_la_dispatch(
 
     for order in orders:
         started = perf_counter()
-        seen += 1
+        seen += order.passengers
         seen_by_type[order.destination] += order.passengers
 
         effective_predicted = (
