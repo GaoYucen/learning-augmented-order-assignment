@@ -355,7 +355,9 @@ def vdr_la_dispatch(
                     for station in range(station_count):
                         if station == order.destination:
                             continue
-                        future_quota = effective_quota(station, bus.id) * (
+                        # Use the raw predictive quota for the arrival-CDF tail.
+                        # Calibration is applied exactly once through quota_remaining().
+                        future_quota = float(advice.get((station, bus.id), 0.0)) * (
                             1.0 - _cdf(arrival_cdf, station, order.arrival_time)
                         )
                         quantity = min(
